@@ -179,7 +179,7 @@ def run_transductive(
         sampler = dgl.dataloading.MultiLayerNeighborSampler(
             [eval(fanout) for fanout in conf["fan_out"].split(",")]
         )
-        dataloader = dgl.dataloading.NodeDataLoader(
+        dataloader = dgl.dataloading.DataLoader(
             g,
             idx_train,
             sampler,
@@ -191,7 +191,7 @@ def run_transductive(
 
         # SAGE inference is implemented as layer by layer, so the full-neighbor sampler only collects one-hop neighors
         sampler_eval = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-        dataloader_eval = dgl.dataloading.NodeDataLoader(
+        dataloader_eval = dgl.dataloading.DataLoader(
             g,
             torch.arange(g.num_nodes()),
             sampler_eval,
@@ -333,7 +333,7 @@ def run_inductive(
         sampler = dgl.dataloading.MultiLayerNeighborSampler(
             [eval(fanout) for fanout in conf["fan_out"].split(",")]
         )
-        obs_dataloader = dgl.dataloading.NodeDataLoader(
+        obs_dataloader = dgl.dataloading.DataLoader(
             obs_g,
             obs_idx_train,
             sampler,
@@ -344,7 +344,7 @@ def run_inductive(
         )
 
         sampler_eval = dgl.dataloading.MultiLayerFullNeighborSampler(1)
-        obs_dataloader_eval = dgl.dataloading.NodeDataLoader(
+        obs_dataloader_eval = dgl.dataloading.DataLoader(
             obs_g,
             torch.arange(obs_g.num_nodes()),
             sampler_eval,
@@ -353,7 +353,7 @@ def run_inductive(
             drop_last=False,
             num_workers=conf["num_workers"],
         )
-        dataloader_eval = dgl.dataloading.NodeDataLoader(
+        dataloader_eval = dgl.dataloading.DataLoader(
             g,
             torch.arange(g.num_nodes()),
             sampler_eval,
