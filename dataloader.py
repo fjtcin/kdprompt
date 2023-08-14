@@ -97,7 +97,9 @@ def load_cpf_data(dataset, dataset_path, seed, labelrate_train, labelrate_val):
         random_state, labels, labelrate_train, labelrate_val
     )
 
-    features = torch.FloatTensor(np.array(features.todense()))
+    if sp.isspmatrix(features):
+        features = features.toarray()
+    features = torch.FloatTensor(features)
     labels = torch.LongTensor(labels.argmax(axis=1))
 
     adj = normalize_adj(adj)
@@ -381,11 +383,11 @@ class SparseGraph:
             Array, where each entry represents respective node's label(s).
         node_names : np.ndarray, shape [num_nodes], optional
             Names of nodes (as strings).
-        attr_names : np.ndarray, shape [num_attr]
+        attr_names : np.ndarray, shape [num_attr], optional
             Names of the attributes (as strings).
         class_names : np.ndarray, shape [num_classes], optional
             Names of the class labels (as strings).
-        metadata : object
+        metadata : object, optional
             Additional metadata such as text.
 
         """
@@ -420,9 +422,16 @@ class SparseGraph:
                 )
 
         if labels is not None:
-            if labels.shape[0] != adj_matrix.shape[0]:
+            if isinstance(labels, np.ndarray):
+                if labels.shape[0] != adj_matrix.shape[0]:
+                    raise ValueError(
+                        "Dimensions of the adjacency matrix and the label vector don't agree"
+                    )
+            else:
                 raise ValueError(
-                    "Dimensions of the adjacency matrix and the label vector don't agree"
+                    "Label matrix must be a np.ndarray (got {0} instead)".format(
+                        type(labels)
+                    )
                 )
 
         if node_names is not None:
@@ -596,6 +605,57 @@ def sample_per_class(
             for class_index in range(len(sample_indices_per_class))
         ]
     )
+
+
+def save_sparse_graph_to_npz(filepath, sparse_graph):
+    """Save a SparseGraph to a Numpy binary file.
+
+    Parameters
+    ----------
+    filepath : str
+        Name of the output file.
+    sparse_graph : gust.SparseGraph
+        Graph in sparse matrix format.
+
+    """
+    data_dict = {
+        'adj_data': sparse_graph.adj_matrix.data,
+        'adj_indices': sparse_graph.adj_matrix.indices,
+        'adj_indptr': sparse_graph.adj_matrix.indptr,
+        'adj_shape': sparse_graph.adj_matrix.shape
+    }
+    if sp.isspmatrix(sparse_graph.attr_matrix):
+        data_dict['attr_data'] = sparse_graph.attr_matrix.data
+        data_dict['attr_indices'] = sparse_graph.attr_matrix.indices
+        data_dict['attr_indptr'] = sparse_graph.attr_matrix.indptr
+        data_dict['attr_shape'] = sparse_graph.attr_matrix.shape
+    elif isinstance(sparse_graph.attr_matrix, np.ndarray):
+        data_dict['attr_matrix'] = sparse_graph.attr_matrix
+
+    if sp.isspmatrix(sparse_graph.labels):
+        data_dict['labels_data'] = sparse_graph.labels.data
+        data_dict['labels_indices'] = sparse_graph.labels.indices
+        data_dict['labels_indptr'] = sparse_graph.labels.indptr
+        data_dict['labels_shape'] = sparse_graph.labels.shape
+    elif isinstance(sparse_graph.labels, np.ndarray):
+        data_dict['labels'] = sparse_graph.labels
+
+    if sparse_graph.node_names is not None:
+        data_dict['node_names'] = sparse_graph.node_names
+
+    if sparse_graph.attr_names is not None:
+        data_dict['attr_names'] = sparse_graph.attr_names
+
+    if sparse_graph.class_names is not None:
+        data_dict['class_names'] = sparse_graph.class_names
+
+    if sparse_graph.metadata is not None:
+        data_dict['metadata'] = sparse_graph.metadata
+
+    if not filepath.endswith('.npz'):
+        filepath += '.npz'
+
+    np.savez(filepath, **data_dict)
 
 
 def get_train_val_test_split(
