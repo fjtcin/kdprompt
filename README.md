@@ -14,6 +14,6 @@ cat /home/fjtcin/Documents/git/kdprompt/outputs/transductive/ogbn-arxiv/SAGE_MLP
 ```
 
 ```bash
-python train_teacher.py --exp_setting tran --teacher GCN --dataset cora
-python train_student.py --exp_setting tran --teacher GCN --student MLP --dataset cora --out_t_path outputs
+python train_teacher.py --exp_setting tran --teacher SAGE --dataset cora
+python train_student.py --exp_setting tran --teacher SAGE --student MLP --dataset cora --out_t_path outputs --lamb .5 --patience 500
 ```

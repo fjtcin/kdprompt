@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch import nn
 import logging
 import pytz
 import random
@@ -149,9 +150,11 @@ def get_evaluator(dataset):
 
 
 def get_evaluator(dataset):
-    def evaluator(out, labels):
-        pred = out.argmax(1)
-        return pred.eq(labels).float().mean().item()
+    def evaluator(logits, prompts, labels):
+        logits_n = nn.functional.normalize(logits)
+        prompts_n = nn.functional.normalize(prompts)
+        pred = (logits_n @ prompts_n.t()).argmax(dim=1)
+        return pred.eq(labels.argmax(dim=1)).float().mean().item()
 
     return evaluator
 

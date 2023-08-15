@@ -1,9 +1,11 @@
 import argparse
 import numpy as np
 import torch
-import torch.optim as optim
+from torch import optim
+from torch import nn
 from pathlib import Path
 from models import Model
+from criterions import CosineSimilarityLoss, CustomKLDivLoss
 from dataloader import load_data, load_out_t
 from utils import (
     get_logger,
@@ -253,7 +255,8 @@ def run(args):
 
     feats = g.ndata["feat"]
     args.feat_dim = g.ndata["feat"].shape[1]
-    args.label_dim = labels.int().max().item() + 1
+    label_dim = labels.max().item() + 1
+    labels = nn.functional.one_hot(labels).float()
 
     if 0 < args.feature_noise <= 1:
         feats = (
@@ -271,25 +274,20 @@ def run(args):
     logger.info(f"conf: {conf}")
 
     """ Model init """
+    conf["prompts_dim"] = 256
     model = Model(conf)
+    model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
+    # for name, param in model.named_parameters():
+    #     print(name, param.requires_grad)
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
     )
-    criterion_l = torch.nn.NLLLoss()
-    criterion_t = torch.nn.KLDivLoss(reduction="batchmean", log_target=True)
+    criterion_l = CosineSimilarityLoss()
+    criterion_t = CustomKLDivLoss()
     evaluator = get_evaluator(conf["dataset"])
 
     """Load teacher model output"""
     out_t = load_out_t(out_t_dir)
-    logger.debug(
-        f"teacher score on train data: {evaluator(out_t[idx_train], labels[idx_train])}"
-    )
-    logger.debug(
-        f"teacher score on val data: {evaluator(out_t[idx_val], labels[idx_val])}"
-    )
-    logger.debug(
-        f"teacher score on test data: {evaluator(out_t[idx_test], labels[idx_test])}"
-    )
 
     """Data split and run"""
     loss_and_score = []

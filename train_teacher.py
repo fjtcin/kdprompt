@@ -1,9 +1,11 @@
 import argparse
 import numpy as np
 import torch
-import torch.optim as optim
+from torch import optim
+from torch import nn
 from pathlib import Path
 from models import Model
+from criterions import CosineSimilarityLoss
 from dataloader import load_data
 from utils import (
     get_logger,
@@ -214,7 +216,8 @@ def run(args):
 
     feats = g.ndata["feat"]
     args.feat_dim = g.ndata["feat"].shape[1]
-    args.label_dim = labels.int().max().item() + 1
+    label_dim = labels.max().item() + 1
+    labels = nn.functional.one_hot(labels).float()
 
     if 0 < args.feature_noise <= 1:
         feats = (
@@ -230,11 +233,15 @@ def run(args):
     logger.info(f"conf: {conf}")
 
     """ Model init """
+    conf["prompts_dim"] = 256
     model = Model(conf)
+    model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
+    # for name, param in model.named_parameters():
+    #     print(name, param.requires_grad)
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
     )
-    criterion = torch.nn.NLLLoss()
+    criterion = CosineSimilarityLoss()
     evaluator = get_evaluator(conf["dataset"])
 
     """ Data split and run """
