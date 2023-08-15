@@ -739,3 +739,103 @@ def distill_run_inductive(
         f"Best valid model at epoch: {best_epoch: 3d} score_val: {score_val :.4f}, score_test_tran: {score_test_tran :.4f}, score_test_ind: {score_test_ind :.4f}"
     )
     return out, score_val, score_test_tran, score_test_ind
+
+
+
+"""
+4. test
+"""
+
+
+def test_transductive(
+    conf,
+    model,
+    feats,
+    labels,
+    indices,
+    criterion,
+    evaluator,
+    optimizer,
+    logger,
+    loss_and_score,
+):
+    """
+    Train and eval under the transductive setting.
+    The train/valid/test split is specified by `indices`.
+    The input graph is assumed to be large. Thus, SAGE is used for GNNs, mini-batch is used for MLPs.
+
+    loss_and_score: Stores losses and scores.
+    """
+    set_seed(conf["seed"])
+    device = conf["device"]
+    batch_size = conf["batch_size"]
+
+    idx_train, idx_val, idx_test = indices
+
+    feats = feats.to(device)
+    labels = labels.to(device)
+
+    if "MLP" in model.model_name:
+        feats_train, labels_train = feats[idx_train], labels[idx_train]
+        feats_val, labels_val = feats[idx_val], labels[idx_val]
+        feats_test, labels_test = feats[idx_test], labels[idx_test]
+    else:
+        raise NotImplementedError
+
+    best_epoch, best_score_val, count = 0, 0, 0
+    for epoch in range(1, conf["max_epoch"] + 1):
+        loss = train_mini_batch(
+            model, feats_train, labels_train, batch_size, criterion, optimizer
+        )
+
+        if epoch % conf["eval_interval"] == 0:
+            _, loss_train, score_train = evaluate_mini_batch(
+                model, feats_train, labels_train, criterion, batch_size, evaluator
+            )
+            _, loss_val, score_val = evaluate_mini_batch(
+                model, feats_val, labels_val, criterion, batch_size, evaluator
+            )
+            _, loss_test, score_test = evaluate_mini_batch(
+                model, feats_test, labels_test, criterion, batch_size, evaluator
+            )
+
+            logger.debug(
+                f"Ep {epoch:3d} | loss: {loss:.4f} | s_train: {score_train:.4f} | s_val: {score_val:.4f} | s_test: {score_test:.4f}"
+            )
+            loss_and_score += [
+                [
+                    epoch,
+                    loss_train,
+                    loss_val,
+                    loss_test,
+                    score_train,
+                    score_val,
+                    score_test,
+                ]
+            ]
+
+            if score_val >= best_score_val:
+                best_epoch = epoch
+                best_score_val = score_val
+                state = copy.deepcopy(model.state_dict())
+                count = 0
+            else:
+                count += 1
+
+        if count == conf["patience"] or epoch == conf["max_epoch"]:
+            break
+
+    model.load_state_dict(state)
+    out, _, score_val = evaluate_mini_batch(
+        model, feats, labels, criterion, batch_size, evaluator, idx_val
+    )
+
+    score_test = evaluator(out[idx_test], model.prompts, labels[idx_test])
+    logger.info(
+        f"Best valid model at epoch: {best_epoch: 3d}, score_val: {score_val :.4f}, score_test: {score_test :.4f}"
+    )
+    return out, score_val, score_test
+
+
+def test_inductive():
+    pass
