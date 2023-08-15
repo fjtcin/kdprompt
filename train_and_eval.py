@@ -213,6 +213,7 @@ def run_transductive(
 
     best_epoch, best_score_val, count = 0, 0, 0
     for epoch in range(1, conf["max_epoch"] + 1):
+        if epoch % 10 == 0: print(f"Epoch: {epoch}")
         if "SAGE" in model.model_name:
             loss = train_sage(model, data, feats, labels, criterion, optimizer)
         elif "MLP" in model.model_name:
@@ -384,6 +385,7 @@ def run_inductive(
 
     best_epoch, best_score_val, count = 0, 0, 0
     for epoch in range(1, conf["max_epoch"] + 1):
+        if epoch % 10 == 0: print(f"Epoch: {epoch}")
         if "SAGE" in model.model_name:
             loss = train_sage(
                 model, obs_data, obs_feats, obs_labels, criterion, optimizer
@@ -556,6 +558,7 @@ def distill_run_transductive(
 
     best_epoch, best_score_val, count = 0, 0, 0
     for epoch in range(1, conf["max_epoch"] + 1):
+        if epoch % 100 == 0: print(f"Epoch: {epoch}")
         loss_l = train_mini_batch(
             model, feats_l, labels_l, batch_size, criterion_l, optimizer, lamb
         )
@@ -664,6 +667,7 @@ def distill_run_inductive(
 
     best_epoch, best_score_val, count = 0, 0, 0
     for epoch in range(1, conf["max_epoch"] + 1):
+        if epoch % 100 == 0: print(f"Epoch: {epoch}")
         loss_l = train_mini_batch(
             model, feats_l, labels_l, batch_size, criterion_l, optimizer, lamb
         )
@@ -784,6 +788,7 @@ def test_transductive(
 
     best_epoch, best_score_val, count = 0, 0, 0
     for epoch in range(1, conf["max_epoch"] + 1):
+        if epoch % 1000 == 0: print(f"Epoch: {epoch}")
         loss = train_mini_batch(
             model, feats_train, labels_train, batch_size, criterion, optimizer
         )

@@ -59,6 +59,7 @@ def get_args():
 
     """Dataset"""
     parser.add_argument("--dataset", type=str, default="cora", help="Dataset")
+    parser.add_argument("--dataset_base", type=str, default="ogbn-arxiv", help="Dataset base")
     parser.add_argument("--data_path", type=str, default="./data", help="Path to data")
     parser.add_argument(
         "--labelrate_train",
@@ -103,6 +104,9 @@ def get_args():
     )
     parser.add_argument(
         "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
+    )
+    parser.add_argument(
+        "--dataset_base_prompts", type=int, default=40, help="Number of prompts in dataset_base"
     )
 
     """SAGE Specific"""
@@ -199,13 +203,13 @@ def run(args):
             args.output_path,
             "transductive",
             args.dataset,
-            f"{args.teacher}_{args.student}",
+            f"{args.dataset_base}_{args.teacher}_{args.student}",
             f"seed_{args.seed}",
         )
         model_dir = Path.cwd().joinpath(
             args.model_path,
             "transductive",
-            args.dataset,
+            args.dataset_base,
             f"{args.teacher}_{args.student}",
             f"seed_{args.seed}",
         )
@@ -264,7 +268,7 @@ def run(args):
     conf = {}
     if args.model_config_path is not None:
         conf = get_training_config(
-            args.model_config_path, args.student, args.dataset
+            args.model_config_path, args.student, args.dataset_base
         )  # Note: student config
     conf = dict(args.__dict__, **conf)
     conf["device"] = device
@@ -272,7 +276,7 @@ def run(args):
 
     """ Model init """
     model = Model(conf)
-    model.prompts = torch.nn.Parameter(torch.zeros(label_dim, conf["prompts_dim"]).to(device))
+    model.prompts = torch.nn.Parameter(torch.zeros(conf["dataset_base_prompts"], conf["prompts_dim"]).to(device))
     model.load_state_dict(torch.load(model_dir / "model.pth"))
     for param in model.parameters():
         param.requires_grad = False

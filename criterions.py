@@ -8,8 +8,7 @@ class CosineSimilarityLoss(nn.Module):
     def forward(self, logits, prompts, labels):
         logits_n = nn.functional.normalize(logits)
         prompts_n = nn.functional.normalize(prompts)
-        labels_n = nn.functional.normalize(torch.full_like(labels, 0.5) - labels)
-        res = logits_n @ prompts_n.t() * labels_n
+        res = - logits_n @ prompts_n.t() * labels
         return res.mean()
 
 class CustomKLDivLoss(nn.Module):

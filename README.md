@@ -2,7 +2,9 @@
 
 ```bash
 python autoencoder.py --linear
-python train_teacher.py --dataset ogbn-arxiv
+python train_teacher.py --dataset ogbn-arxiv --prompts_dim 64
+python train_student.py --dataset ogbn-arxiv --prompts_dim 64 --max_epoch 500 --patience 50 --save_results --lamb .5
+python test_prompt.py --dataset cora --prompts_dim 64 --max_epoch 500000 --patience 5000
 ```
 
 ```bash
