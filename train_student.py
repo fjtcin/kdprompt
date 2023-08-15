@@ -101,6 +101,9 @@ def get_args():
     parser.add_argument(
         "--norm_type", type=str, default="none", help="One of [none, batch, layer]"
     )
+    parser.add_argument(
+        "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
+    )
 
     """SAGE Specific"""
     parser.add_argument("--batch_size", type=int, default=512)
@@ -274,7 +277,6 @@ def run(args):
     logger.info(f"conf: {conf}")
 
     """ Model init """
-    conf["prompts_dim"] = 256
     model = Model(conf)
     model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
     # for name, param in model.named_parameters():
