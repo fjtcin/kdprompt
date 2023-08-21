@@ -155,7 +155,7 @@ def get_evaluator(dataset):
     def evaluator(logits, prompts, labels):
         logits_n = nn.functional.normalize(logits)
         prompts_n = nn.functional.normalize(prompts)
-        pred = (logits_n @ prompts_n.mT).log_softmax(dim=1).argmax(dim=1)
+        pred = (logits_n @ prompts_n.mT).argmax(dim=1)
         return pred.eq(labels.argmax(dim=1)).float().mean().item()
 
     return evaluator
