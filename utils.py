@@ -9,6 +9,7 @@ import yaml
 import shutil
 from datetime import datetime
 from ogb.nodeproppred import Evaluator
+import dgl
 from dgl import function as fn
 
 CPF_data = ["cora", "citeseer", "pubmed", "a-computer", "a-photo"]
@@ -20,11 +21,12 @@ BGNN_data = ["house_class", "vk_class"]
 def set_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
+    dgl.seed(seed)
     random.seed(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 
 def get_training_config(config_path, model_name, dataset):
@@ -153,7 +155,7 @@ def get_evaluator(dataset):
     def evaluator(logits, prompts, labels):
         logits_n = nn.functional.normalize(logits)
         prompts_n = nn.functional.normalize(prompts)
-        pred = (logits_n @ prompts_n.t()).argmax(dim=1)
+        pred = (logits_n @ prompts_n.mT).log_softmax(dim=1).argmax(dim=1)
         return pred.eq(labels.argmax(dim=1)).float().mean().item()
 
     return evaluator
