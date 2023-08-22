@@ -3,145 +3,176 @@ from pathlib import Path
 import copy
 import numpy as np
 import scipy.sparse as ss
-
-import torch
-
-import torch_geometric.transforms as T
-from torch_geometric.datasets import Planetoid
-from torch_geometric.nn import GAE, VGAE, GCNConv
-from torch_geometric import seed_everything
-
+from utils import set_seed
 from dataloader import SparseGraph, save_sparse_graph_to_npz
 
-seed_everything(42)
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--variational', action='store_true')
-parser.add_argument('--linear', action='store_true')
-parser.add_argument('--dataset', type=str, default='Cora',
-                    choices=['Cora', 'CiteSeer', 'PubMed'])
-parser.add_argument('--epochs', type=int, default=10000)
-args = parser.parse_args()
-
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
-
-transform = T.Compose([
-    T.NormalizeFeatures(),
-    T.ToDevice(device),
-])
-path = Path('data/planetoid')
-dataset = Planetoid(path, args.dataset, transform=transform)
-data = dataset[0]
-data.train_mask = data.val_mask = data.test_mask = None
-split_edges_transform = T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
-                        split_labels=True, add_negative_train_samples=False)
-train_data, val_data, test_data = split_edges_transform(data)
+import torch
+from torch import nn
+from torch.optim import Adam
+from torch_geometric.datasets import Planetoid
+import torch_geometric.transforms as T
 
 
-class GCNEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
+class SemiSupervisedAutoencoder(nn.Module):
+    def __init__(self, num_classes, dropout_autoencoder, dropout_MLP):
         super().__init__()
-        self.conv1 = GCNConv(in_channels, 2 * out_channels)
-        self.conv2 = GCNConv(2 * out_channels, out_channels)
 
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        return self.conv2(x, edge_index)
+        # Shared encoder
+        self.encoder = nn.Sequential(
+            nn.Linear(1433, 1024),
+            nn.ReLU(),
+            nn.Dropout(dropout_autoencoder),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout_autoencoder),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_autoencoder),
+            nn.Linear(256, 128)
+        )
+
+        # Decoder for reconstruction task
+        self.decoder = nn.Sequential(
+            nn.Linear(128, 256),
+            nn.ReLU(),
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1433),
+            nn.Sigmoid()  # because the input is binary
+        )
+
+        # Classifier for classification task
+        self.classifier = nn.Sequential(
+            nn.Linear(128, 256),
+            nn.ReLU(),
+            nn.Dropout(dropout_MLP),
+            nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        reconstructed = self.decoder(x)
+        class_probs = self.classifier(x)
+        return reconstructed, class_probs
 
 
-class VariationalGCNEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
+class CombinedLoss(nn.Module):
+    def __init__(self, lamb=.5):
         super().__init__()
-        self.conv1 = GCNConv(in_channels, 2 * out_channels)
-        self.conv_mu = GCNConv(2 * out_channels, out_channels)
-        self.conv_logstd = GCNConv(2 * out_channels, out_channels)
+        self.mse_loss = nn.MSELoss()
+        self.cross_entropy_loss = nn.CrossEntropyLoss()
+        self.lamb = lamb
 
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        return self.conv_mu(x, edge_index), self.conv_logstd(x, edge_index)
-
-
-class LinearEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.conv = GCNConv(in_channels, out_channels)
-
-    def forward(self, x, edge_index):
-        return self.conv(x, edge_index)
+    def forward(self, reconstructed, original, class_probs, labels):
+        reconstruction_loss = self.mse_loss(reconstructed, original)
+        classification_loss = self.cross_entropy_loss(class_probs, labels)
+        return self.lamb * reconstruction_loss + (1 - self.lamb) * classification_loss
 
 
-class VariationalLinearEncoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.conv_mu = GCNConv(in_channels, out_channels)
-        self.conv_logstd = GCNConv(in_channels, out_channels)
-
-    def forward(self, x, edge_index):
-        return self.conv_mu(x, edge_index), self.conv_logstd(x, edge_index)
+def AccuracyEvaluator():
+    def evaluator(class_probs, labels):
+        return class_probs.argmax(dim=-1).eq(labels).float().mean().item()
+    return evaluator
 
 
-in_channels, out_channels = data.num_features, 128
-
-if not args.variational and not args.linear:
-    model = GAE(GCNEncoder(in_channels, out_channels))
-elif not args.variational and args.linear:
-    model = GAE(LinearEncoder(in_channels, out_channels))
-elif args.variational and not args.linear:
-    model = VGAE(VariationalGCNEncoder(in_channels, out_channels))
-elif args.variational and args.linear:
-    model = VGAE(VariationalLinearEncoder(in_channels, out_channels))
-
-model = model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-
-
-def train():
+def train(model, feats, labels, criterion, optimizer):
     model.train()
+    reconstructed, class_probs = model(feats)
+    loss = criterion(reconstructed, feats, class_probs, labels)
+    loss_val = loss.item()
     optimizer.zero_grad()
-    z = model.encode(train_data.x, train_data.edge_index)
-    loss = model.recon_loss(z, train_data.pos_edge_label_index)
-    if args.variational:
-        loss = loss + (1 / train_data.num_nodes) * model.kl_loss()
     loss.backward()
     optimizer.step()
-    return float(loss)
+    return loss_val
 
-def test(data):
+
+def eval(model, feats, labels, criterion, evaluator):
     model.eval()
     with torch.no_grad():
-        z = model.encode(data.x, data.edge_index)
-        return model.test(z, data.pos_edge_label_index, data.neg_edge_label_index)
+        reconstructed, class_probs = model(feats)
+        loss = criterion(reconstructed, feats, class_probs, labels)
+        score = evaluator(class_probs, labels)
+        return loss.item(), score
 
 
-best_epoch, best_score_val, count = 0, 0, 0
-for epoch in range(1, args.epochs + 1):
-    loss = train()
-    auc, ap = test(test_data)
-    if epoch % 100 == 0:
-        print(f'Epoch: {epoch:03d}, AUC: {auc:.4f}, AP: {ap:.4f}')
-    score_val = auc
-    if score_val >= best_score_val:
-        best_epoch = epoch
-        best_score_val = score_val
-        state = copy.deepcopy(model.state_dict())
-        count = 0
+def get_args():
+    parser = argparse.ArgumentParser(description="PyTorch DGL implementation")
+    parser.add_argument("--device", type=int, default=0, help="CUDA device, -1 means CPU")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    parser.add_argument('--dataset', type=str, default='cora', choices=['cora', 'citeSeer', 'pubmed'])
+    parser.add_argument("--learning_rate", type=float, default=0.01)
+    parser.add_argument("--weight_decay", type=float, default=0.0005)
+    parser.add_argument("--dropout_autoencoder", type=float, default=0)
+    parser.add_argument("--dropout_MLP", type=float, default=0)
+    parser.add_argument("--max_epoch", type=int, default=500, help="Evaluate once per how many epochs")
+    parser.add_argument("--eval_interval", type=int, default=1, help="Evaluate once per how many epochs")
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=50,
+        help="Early stop is the score on validation set does not improve for how many epochs",
+    )
+    parser.add_argument(
+        "--lamb",
+        type=float,
+        default=0,
+        help="Parameter balances loss from autoencoder and MLP",
+    )
+    return parser.parse_args()
+
+
+def run(args):
+    set_seed(args.seed)
+    if torch.cuda.is_available() and args.device >= 0:
+        device = torch.device("cuda:" + str(args.device))
     else:
-        count += 1
-    if count == 2000:
-        break
+        device = "cpu"
+    path = Path('data/planetoid')
+    dataset = Planetoid(path, args.dataset, transform=T.ToDevice(device))
+    data = dataset[0]
+
+    model = SemiSupervisedAutoencoder(data.y.max().item()+1, args.dropout_autoencoder, args.dropout_MLP).to(device)
+    criterion = CombinedLoss(args.lamb)
+    optimizer = Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    evaluator = AccuracyEvaluator()
+
+    best_score_val, count = 0, 0
+    for epoch in range(1, args.max_epoch + 1):
+        train(model, data.x[data.train_mask], data.y[data.train_mask], criterion, optimizer)
+        if epoch % args.eval_interval == 0:
+            loss_train, score_train = eval(model, data.x[data.train_mask], data.y[data.train_mask], criterion, evaluator)
+            loss_val, score_val = eval(model, data.x[data.val_mask], data.y[data.val_mask], criterion, evaluator)
+            if epoch / args.eval_interval % 10 == 0: print(f"(epoch={epoch}, {loss_train:.4f}, {score_train:.4f}) loss: {loss_val:.4f}, score: {score_val:.4f}")
+            if score_val >= best_score_val:
+                best_score_val = score_val
+                state = copy.deepcopy(model.state_dict())
+                count = 0
+            else:
+                count += 1
+            if count == args.patience:
+                break
+
+    model.load_state_dict(state)
+    model.eval()
+    with torch.no_grad():
+        loss_test, score_test = eval(model, data.x[data.test_mask], data.y[data.test_mask], criterion, evaluator)
+        print(f"(test) loss: {loss_test:.4f}, score: {score_test:.4f}")
+        z = model.encoder(data.x)
+
+    edge_list = data.edge_index.numpy(force=True)
+    ones = np.ones(data.num_edges)
+    adj_matrix = ss.csr_matrix((ones, (edge_list[0], edge_list[1])))
+
+    sparse_graph = SparseGraph(adj_matrix, attr_matrix=z.numpy(force=True), labels=data.y.numpy(force=True))
+    save_sparse_graph_to_npz('data/cora.npz', sparse_graph)
 
 
-model.load_state_dict(state)
-model.eval()
-with torch.no_grad():
-    z = model.encode(data.x, data.edge_index)
+def main():
+    args = get_args()
+    run(args)
 
-edge_list = data.edge_index.numpy(force=True)
-ones = np.ones(data.num_edges)
-adj_matrix = ss.csr_matrix((ones, (edge_list[0], edge_list[1])))
 
-sparse_graph = SparseGraph(adj_matrix, attr_matrix=z.numpy(force=True), labels=data.y.numpy(force=True))
-save_sparse_graph_to_npz('data/cora.npz', sparse_graph)
+if __name__ == "__main__":
+    main()
