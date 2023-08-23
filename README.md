@@ -8,6 +8,7 @@ python test_prompt.py --dataset cora --prompts_dim 64 --max_epoch 500000 --patie
 ```
 
 ```bash
+python autoencoder.py --dropout_autoencoder 0.7 --dropout_MLP 0.3
 # Baseline
 python train_teacher.py --exp_setting tran --teacher SAGE --dataset cora
 python train_teacher.py --exp_setting tran --teacher MLP --dataset cora
