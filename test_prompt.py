@@ -276,11 +276,14 @@ def run(args):
 
     """ Model init """
     model = Model(conf)
-    model.prompts = torch.nn.Parameter(torch.zeros(conf["dataset_base_prompts"], conf["prompts_dim"]).to(device))
+    model.prompts = torch.nn.Parameter(torch.empty(conf["dataset_base_prompts"], conf["prompts_dim"]).to(device))
+    model.p = torch.nn.Parameter(torch.empty(1, conf["feat_dim"]).to(device))
     model.load_state_dict(torch.load(model_dir / "model.pth"))
     for param in model.parameters():
         param.requires_grad = False
     model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
+    model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
+    model.p.requires_grad_(False)
     for name, param in model.named_parameters():
         print(name, param.requires_grad)
     optimizer = optim.Adam(

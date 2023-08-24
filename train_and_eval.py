@@ -73,7 +73,7 @@ def train_mini_batch(model, feats, labels, batch_size, criterion, optimizer, lam
     total_loss = 0
     for i in range(num_batches):
         # No graph needed for the forward function
-        logits = model(None, feats[idx_batch[i]])
+        logits = model(None, feats[idx_batch[i]] * model.p)
 
         loss = criterion(logits, model.prompts, labels[idx_batch[i]])
         total_loss += loss.item()
@@ -119,7 +119,7 @@ def evaluate_mini_batch(
         num_batches = int(np.ceil(len(feats) / batch_size))
         out_list = []
         for i in range(num_batches):
-            logits = model.inference(None, feats[batch_size * i : batch_size * (i + 1)])
+            logits = model.inference(None, feats[batch_size * i : batch_size * (i + 1)] * model.p)
             # out = logits.log_softmax(dim=1)
             out_list.append(logits)
 
