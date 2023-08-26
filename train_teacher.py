@@ -303,8 +303,10 @@ def run(args):
     logger.info(f"# params {sum(p.numel() for p in model.parameters())}")
 
     """ Saving teacher outputs """
-    out_np = out.detach().cpu().numpy()
+    out_np = out.numpy(force=True)
+    prompts_np = model.prompts.numpy(force=True)
     np.savez(output_dir.joinpath("out"), out_np)
+    np.savez(output_dir.joinpath("prompts"), prompts_np)
 
     """ Saving loss curve and model """
     if args.save_results:

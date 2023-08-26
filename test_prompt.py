@@ -283,7 +283,7 @@ def run(args):
         param.requires_grad = False
     model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
     model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
-    model.p.requires_grad_(False)
+    # model.p.requires_grad_(False)
     for name, param in model.named_parameters():
         print(name, param.requires_grad)
     optimizer = optim.Adam(
