@@ -141,10 +141,11 @@ a-photo:
 ogbn-arxiv:
   MLP:
     num_layers: 3
-    hidden_dim: 256
-    weight_decay: 0
-    dropout_ratio: 0.2
-    norm_type: batch
+    hidden_dim: 1024  # 256 default
+    learning_rate: 0.01
+    weight_decay: 0  # 0.005
+    dropout_ratio: 0.3  # 0.6  # 0.2 default
+    norm_type: layer
 
   MLP3w4:
     num_layers: 3
