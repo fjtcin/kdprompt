@@ -168,10 +168,6 @@ def load_bgnn_data(dataset, dataset_path, split_idx):
     return g, labels, idx_train, idx_val, idx_test
 
 
-def load_out_t(out_t_dir):
-    return torch.from_numpy(np.load(out_t_dir.joinpath("out.npz"))["arr_0"])
-
-
 """ For NonHom"""
 dataset_drive_url = {"pokec": "1dNs5E7BrWJbgcHeQ_zuy5Ozp2tRCWG0y"}
 splits_drive_url = {"pokec": "1ZhpAiyTNc0cE_hhgyiqxnkKREHK7MK-_"}

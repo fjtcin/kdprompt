@@ -87,34 +87,10 @@ def get_args():
     )
     parser.add_argument("--teacher", type=str, default="SAGE", help="Teacher model")
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="Model number of layers"
-    )
-    parser.add_argument(
-        "--hidden_dim", type=int, default=128, help="Model hidden layer dimensions"
-    )
-    parser.add_argument("--dropout_ratio", type=float, default=0)
-    parser.add_argument(
-        "--norm_type", type=str, default="none", help="One of [none, batch, layer]"
-    )
-    parser.add_argument(
         "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
     )
 
-    """SAGE Specific"""
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument(
-        "--fan_out",
-        type=str,
-        default="5,5",
-        help="Number of samples for each layer in SAGE. Length = num_layers",
-    )
-    parser.add_argument(
-        "--num_workers", type=int, default=0, help="Number of workers for sampler"
-    )
-
     """Optimization"""
-    parser.add_argument("--learning_rate", type=float, default=0.01)
-    parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument(
         "--max_epoch", type=int, default=500, help="Evaluate once per how many epochs"
     )
@@ -170,15 +146,10 @@ def run(args):
         device = "cpu"
 
     if args.feature_noise != 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "noisy_features", f"noise_{args.feature_noise}"
-        )
+        args.output_path = args.output_path + f"/noise_{args.feature_noise}"
 
     if args.feature_aug_k > 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "aug_features", f"aug_hop_{args.feature_aug_k}"
-        )
-        args.teacher = f"GA{args.feature_aug_k}{args.teacher}"
+        args.output_path = args.output_path + f"/aug_hop_{args.feature_aug_k}"
 
     if args.exp_setting == "tran":
         output_dir = Path.cwd().joinpath(
@@ -230,7 +201,7 @@ def run(args):
     """ Model config """
     conf = {}
     if args.model_config_path is not None:
-        conf = get_training_config(args.model_config_path, args.teacher, args.dataset)
+        conf = get_training_config(args.model_config_path, f"{f'GA{args.feature_aug_k}' if args.feature_aug_k else ''}{args.teacher}", args.dataset)
     conf = dict(args.__dict__, **conf)
     conf["device"] = device
     logger.info(f"conf: {conf}")

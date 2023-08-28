@@ -6,7 +6,7 @@ from torch import nn
 from pathlib import Path
 from models import Model
 from criterions import CosineSimilarityLoss, CustomKLDivLoss
-from dataloader import load_data, load_out_t
+from dataloader import load_data
 from utils import (
     get_logger,
     get_evaluator,
@@ -89,37 +89,10 @@ def get_args():
     parser.add_argument("--teacher", type=str, default="SAGE", help="Teacher model")
     parser.add_argument("--student", type=str, default="MLP", help="Student model")
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="Student model number of layers"
-    )
-    parser.add_argument(
-        "--hidden_dim",
-        type=int,
-        default=64,
-        help="Student model hidden layer dimensions",
-    )
-    parser.add_argument("--dropout_ratio", type=float, default=0)
-    parser.add_argument(
-        "--norm_type", type=str, default="none", help="One of [none, batch, layer]"
-    )
-    parser.add_argument(
         "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
     )
 
-    """SAGE Specific"""
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument(
-        "--fan_out",
-        type=str,
-        default="5,5",
-        help="Number of samples for each layer in SAGE. Length = num_layers",
-    )
-    parser.add_argument(
-        "--num_workers", type=int, default=0, help="Number of workers for sampler"
-    )
-
     """Optimization"""
-    parser.add_argument("--learning_rate", type=float, default=0.01)
-    parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument(
         "--max_epoch", type=int, default=500, help="Evaluate once per how many epochs"
     )
@@ -154,6 +127,11 @@ def get_args():
         default=0,
         help="Augment node futures by aggregating feature_aug_k-hop neighbor features",
     )
+    parser.add_argument(
+        "--upstream_feature_aug_k",
+        type=int,
+        default=0,
+    )
 
     """Distiall"""
     parser.add_argument(
@@ -162,11 +140,8 @@ def get_args():
         default=0,
         help="Parameter balances loss from hard labels and teacher outputs, take values in [0, 1]",
     )
-    parser.add_argument(
-        "--out_t_path", type=str, default="outputs", help="Path to load teacher outputs"
-    )
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     return args
 
 
@@ -186,19 +161,16 @@ def run(args):
         device = "cpu"
 
     if args.feature_noise != 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "noisy_features", f"noise_{args.feature_noise}"
-        )
-        # Teacher is assumed to be trained on the same noisy features as well.
-        args.out_t_path = args.output_path
+        args.output_path = args.output_path + f"/noise_{args.feature_noise}"
+
+    args.out_t_path = args.output_path  # Path to load teacher outputs
 
     if args.feature_aug_k > 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "aug_features", f"aug_hop_{args.feature_aug_k}"
-        )
-        # NOTE: Teacher may or may not have augmented features, specify args.out_t_path explicitly.
-        # args.out_t_path =
-        args.student = f"GA{args.feature_aug_k}{args.student}"
+        args.output_path = args.output_path + f"/aug_hop_{args.feature_aug_k}"
+
+    if args.upstream_feature_aug_k > 0:
+        # Teacher may or may not have augmented features.
+        args.out_t_path = args.out_t_path + f"/aug_hop_{args.upstream_feature_aug_k}"
 
     if args.exp_setting == "tran":
         output_dir = Path.cwd().joinpath(
@@ -270,7 +242,7 @@ def run(args):
     conf = {}
     if args.model_config_path is not None:
         conf = get_training_config(
-            args.model_config_path, args.student, args.dataset
+            args.model_config_path, f"{f'GA{args.feature_aug_k}' if args.feature_aug_k else ''}{args.student}", args.dataset
         )  # Note: student config
     conf = dict(args.__dict__, **conf)
     conf["device"] = device
@@ -293,7 +265,7 @@ def run(args):
     evaluator = get_evaluator(conf["dataset"])
 
     """Load teacher model output"""
-    out_t = load_out_t(out_t_dir)
+    out_t = torch.from_numpy(np.load(out_t_dir.joinpath("out.npz"))["arr_0"])
 
     """Data split and run"""
     loss_and_score = []

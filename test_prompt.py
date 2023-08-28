@@ -37,7 +37,7 @@ def get_args():
         help="Set to True to display log info in console",
     )
     parser.add_argument(
-        "--output_path", type=str, default="results", help="Path to save outputs"
+        "--output_path", type=str, default="outputs", help="Path to save outputs"
     )
     parser.add_argument(
         "--num_exp", type=int, default=1, help="Repeat how many experiments"
@@ -90,40 +90,13 @@ def get_args():
     parser.add_argument("--teacher", type=str, default="SAGE", help="Teacher model")
     parser.add_argument("--student", type=str, default="MLP", help="Student model")
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="Student model number of layers"
-    )
-    parser.add_argument(
-        "--hidden_dim",
-        type=int,
-        default=64,
-        help="Student model hidden layer dimensions",
-    )
-    parser.add_argument("--dropout_ratio", type=float, default=0)
-    parser.add_argument(
-        "--norm_type", type=str, default="none", help="One of [none, batch, layer]"
-    )
-    parser.add_argument(
         "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
     )
     parser.add_argument(
         "--dataset_base_prompts", type=int, default=40, help="Number of prompts in dataset_base"
     )
 
-    """SAGE Specific"""
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument(
-        "--fan_out",
-        type=str,
-        default="5,5",
-        help="Number of samples for each layer in SAGE. Length = num_layers",
-    )
-    parser.add_argument(
-        "--num_workers", type=int, default=0, help="Number of workers for sampler"
-    )
-
     """Optimization"""
-    parser.add_argument("--learning_rate", type=float, default=0.01)
-    parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument(
         "--max_epoch", type=int, default=500, help="Evaluate once per how many epochs"
     )
@@ -158,13 +131,13 @@ def get_args():
         default=0,
         help="Augment node futures by aggregating feature_aug_k-hop neighbor features",
     )
-
-    """Test"""
     parser.add_argument(
-        "--model_path", type=str, default="outputs", help="Path to load student model"
+        "--upstream_feature_aug_k",
+        type=int,
+        default=0,
     )
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     return args
 
 
@@ -184,19 +157,15 @@ def run(args):
         device = "cpu"
 
     if args.feature_noise != 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "noisy_features", f"noise_{args.feature_noise}"
-        )
-        # Teacher is assumed to be trained on the same noisy features as well.
-        args.out_t_path = args.output_path
+        args.output_path = args.output_path + f"/noise_{args.feature_noise}"
+
+    args.model_path = args.output_path  # Path to load the student model
 
     if args.feature_aug_k > 0:
-        args.output_path = Path.cwd().joinpath(
-            args.output_path, "aug_features", f"aug_hop_{args.feature_aug_k}"
-        )
-        # NOTE: Teacher may or may not have augmented features, specify args.out_t_path explicitly.
-        # args.out_t_path =
-        args.student = f"GA{args.feature_aug_k}{args.student}"
+        args.output_path = args.output_path + f"/aug_hop_{args.feature_aug_k}"
+
+    if args.upstream_feature_aug_k > 0:
+        args.model_path = args.model_path + f"/aug_hop_{args.upstream_feature_aug_k}"
 
     if args.exp_setting == "tran":
         output_dir = Path.cwd().joinpath(
@@ -223,7 +192,7 @@ def run(args):
             f"seed_{args.seed}",
         )
         model_dir = Path.cwd().joinpath(
-            args.out_t_path,
+            args.model_path,
             "inductive",
             f"split_rate_{args.split_rate}",
             args.dataset,
@@ -268,8 +237,8 @@ def run(args):
     conf = {}
     if args.model_config_path is not None:
         conf = get_training_config(
-            args.model_config_path, args.student, args.dataset_base
-        )  # Note: student config
+            args.model_config_path, f"{f'GA{args.upstream_feature_aug_k}' if args.upstream_feature_aug_k else ''}{args.student}_{args.dataset_base}", args.dataset
+        )
     conf = dict(args.__dict__, **conf)
     conf["device"] = device
     logger.info(f"conf: {conf}")

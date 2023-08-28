@@ -185,7 +185,6 @@ def run_transductive(
             batch_size=batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=conf["num_workers"],
         )
 
         # SAGE inference is implemented as layer by layer, so the full-neighbor sampler only collects one-hop neighors
@@ -197,7 +196,6 @@ def run_transductive(
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=conf["num_workers"],
         )
 
         data = dataloader
@@ -340,7 +338,6 @@ def run_inductive(
             batch_size=batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=conf["num_workers"],
         )
 
         sampler_eval = dgl.dataloading.MultiLayerFullNeighborSampler(1)
@@ -351,7 +348,6 @@ def run_inductive(
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=conf["num_workers"],
         )
         dataloader_eval = dgl.dataloading.DataLoader(
             g,
@@ -360,7 +356,6 @@ def run_inductive(
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,
-            num_workers=conf["num_workers"],
         )
 
         obs_data = obs_dataloader
