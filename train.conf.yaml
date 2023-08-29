@@ -16,6 +16,15 @@ cora:
     dropout_ratio: 0
     weight_decay: 0.0005
 
+  SAGE_ogbn-arxiv:
+    num_layers: 3
+    hidden_dim: 256
+    dropout_ratio: 0.2
+    learning_rate: 0.01
+    weight_decay: 0
+    norm_type: batch
+    fan_out: 5,10,15
+
   GA1SAGE:
     fan_out: 5,5
     learning_rate: 0.01
@@ -23,6 +32,11 @@ cora:
     weight_decay: 0.0005
 
   MLP:
+    learning_rate: 0.01
+    weight_decay: 0.005
+    dropout_ratio: 0.6
+
+  GA1MLP:
     learning_rate: 0.01
     weight_decay: 0.005
     dropout_ratio: 0.6
@@ -206,6 +220,15 @@ ogbn-arxiv:
     norm_type: batch
 
   SAGE:
+    num_layers: 3
+    hidden_dim: 256
+    dropout_ratio: 0.2
+    learning_rate: 0.01
+    weight_decay: 0
+    norm_type: batch
+    fan_out: 5,10,15
+
+  GA1SAGE:
     num_layers: 3
     hidden_dim: 256
     dropout_ratio: 0.2

@@ -212,7 +212,6 @@ def run(args):
     check_readable(out_t_dir)
 
     logger = get_logger(output_dir.joinpath("log"), args.console_log, args.log_level)
-    logger.info(f"output_dir: {output_dir}")
     logger.info(f"out_t_dir: {out_t_dir}")
 
     """ Load data and model config"""
@@ -224,9 +223,7 @@ def run(args):
         labelrate_train=args.labelrate_train,
         labelrate_val=args.labelrate_val,
     )
-
-    logger.info(f"Total {g.number_of_nodes()} nodes.")
-    logger.info(f"Total {g.number_of_edges()} edges.")
+    logger.info(f"Total {g.number_of_nodes()} nodes, {g.number_of_edges()} edges.")
 
     feats = g.ndata["feat"]
     args.feat_dim = g.ndata["feat"].shape[1]
@@ -255,8 +252,7 @@ def run(args):
     model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
     model.prompts.requires_grad_(False)
     model.p.requires_grad_(False)
-    # for name, param in model.named_parameters():
-    #     print(name, param.requires_grad)
+    logger.info(f"prompts.requires_grad = {model.prompts.requires_grad}, p.requires_grad = {model.p.requires_grad}")
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
     )
@@ -333,10 +329,7 @@ def run(args):
         )
         score_lst = [score_test_tran, score_test_ind]
 
-    logger.info(
-        f"num_layers: {conf['num_layers']}. hidden_dim: {conf['hidden_dim']}. dropout_ratio: {conf['dropout_ratio']}"
-    )
-    logger.info(f"# params {sum(p.numel() for p in model.parameters())}")
+    logger.info(f"# params {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     """ Saving student outputs """
     out_np = out.detach().cpu().numpy()

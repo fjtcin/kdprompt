@@ -18,7 +18,7 @@ from utils import (
     graph_split,
     feature_prop,
 )
-from train_and_eval import test_transductive, test_inductive
+from train_and_eval import run_transductive, run_inductive
 
 
 def get_args():
@@ -88,7 +88,7 @@ def get_args():
         help="Path to model configeration",
     )
     parser.add_argument("--teacher", type=str, default="SAGE", help="Teacher model")
-    parser.add_argument("--student", type=str, default="MLP", help="Student model")
+    parser.add_argument("--student", type=str, default="", help="Student model")
     parser.add_argument(
         "--prompts_dim", type=int, default=256, help="Model prompts dimensions"
     )
@@ -172,14 +172,14 @@ def run(args):
             args.output_path,
             "transductive",
             args.dataset,
-            f"{args.dataset_base}_{args.teacher}_{args.student}",
+            f"{args.dataset_base}_{args.teacher}_{args.student}" if args.student else f"{args.dataset_base}_{args.teacher}",
             f"seed_{args.seed}",
         )
         model_dir = Path.cwd().joinpath(
             args.model_path,
             "transductive",
             args.dataset_base,
-            f"{args.teacher}_{args.student}",
+            f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
             f"seed_{args.seed}",
         )
     elif args.exp_setting == "ind":
@@ -207,7 +207,6 @@ def run(args):
     check_readable(model_dir)
 
     logger = get_logger(output_dir.joinpath("log"), args.console_log, args.log_level)
-    logger.info(f"output_dir: {output_dir}")
     logger.info(f"model_dir: {model_dir}")
 
     """ Load data and model config"""
@@ -219,9 +218,7 @@ def run(args):
         labelrate_train=args.labelrate_train,
         labelrate_val=args.labelrate_val,
     )
-
-    logger.info(f"Total {g.number_of_nodes()} nodes.")
-    logger.info(f"Total {g.number_of_edges()} edges.")
+    logger.info(f"Total {g.number_of_nodes()} nodes, {g.number_of_edges()} edges.")
 
     feats = g.ndata["feat"]
     args.feat_dim = g.ndata["feat"].shape[1]
@@ -237,7 +234,7 @@ def run(args):
     conf = {}
     if args.model_config_path is not None:
         conf = get_training_config(
-            args.model_config_path, f"{f'GA{args.upstream_feature_aug_k}' if args.upstream_feature_aug_k else ''}{args.student}_{args.dataset_base}", args.dataset
+            args.model_config_path, f"{f'GA{args.upstream_feature_aug_k}' if args.upstream_feature_aug_k else ''}{args.student if args.student else args.teacher}_{args.dataset_base}", args.dataset
         )
     conf = dict(args.__dict__, **conf)
     conf["device"] = device
@@ -253,8 +250,7 @@ def run(args):
     model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
     model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
     # model.p.requires_grad_(False)
-    for name, param in model.named_parameters():
-        print(name, param.requires_grad)
+    logger.info(f"prompts.requires_grad = {model.prompts.requires_grad}, p.requires_grad = {model.p.requires_grad}")
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
     )
@@ -270,9 +266,10 @@ def run(args):
         if args.feature_aug_k > 0:
             feats = feature_prop(feats, g, args.feature_aug_k)
 
-        out, score_val, score_test = test_transductive(
+        out, score_val, score_test = run_transductive(
             conf,
             model,
+            g,
             feats,
             labels,
             indices,
@@ -295,7 +292,7 @@ def run(args):
             feats = feature_prop(feats, g, args.feature_aug_k)
             feats[idx_obs] = obs_feats
 
-        out, score_val, score_test_tran, score_test_ind = test_inductive(
+        out, score_val, score_test_tran, score_test_ind = run_inductive(
             conf,
             model,
             g,
@@ -310,10 +307,7 @@ def run(args):
         )
         score_lst = [score_test_tran, score_test_ind]
 
-    logger.info(
-        f"num_layers: {conf['num_layers']}. hidden_dim: {conf['hidden_dim']}. dropout_ratio: {conf['dropout_ratio']}"
-    )
-    logger.info(f"# params {sum(p.numel() for p in model.parameters())}")
+    logger.info(f"# params {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     """ Saving student outputs """
     out_np = out.detach().cpu().numpy()
