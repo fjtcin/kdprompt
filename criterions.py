@@ -19,7 +19,7 @@ class CosineSimilarityLoss(nn.Module):
         return self.kl_div_loss((logits_n @ prompts_n.mT).log_softmax(dim=1), labels.log_softmax(dim=1))
         # return self.mse_loss((logits_n @ prompts_n.mT), labels) / labels.size(0)
         # return self.cos_loss((logits_n @ prompts_n.mT), labels, torch.tensor([1], device='cuda:0'))
-        return self.js_divergence((logits_n @ prompts_n.mT).log_softmax(dim=1), labels.log_softmax(dim=1))
+        # return self.js_divergence((logits_n @ prompts_n.mT).log_softmax(dim=1), labels.log_softmax(dim=1))
 
 
 class CustomKLDivLoss(nn.Module):

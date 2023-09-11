@@ -125,6 +125,14 @@ pubmed:
     weight_decay: 0
     dropout_ratio: 0.4
 
+  GA1MLP_ogbn-arxiv:
+    num_layers: 3
+    hidden_dim: 1024
+    learning_rate: 0.01
+    weight_decay: 0
+    dropout_ratio: 0.3
+    norm_type: layer
+
   GAT:
     dropout_ratio: 0.6
     weight_decay: 0.01
