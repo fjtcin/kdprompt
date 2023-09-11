@@ -332,7 +332,7 @@ def run(args):
     logger.info(f"# params {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     """ Saving student outputs """
-    out_np = out.detach().cpu().numpy()
+    out_np = out.numpy(force=True)
     np.savez(output_dir.joinpath("out"), out_np)
 
     """ Saving loss curve and model """

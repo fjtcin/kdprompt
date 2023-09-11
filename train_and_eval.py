@@ -17,9 +17,9 @@ def train(model, data, feats, labels, criterion, optimizer, idx_train, lamb=1):
     model.train()
 
     # Compute loss and prediction
-    logits = model(data, feats)
-    out = logits.log_softmax(dim=1)
-    loss = criterion(out[idx_train], labels[idx_train])
+    logits = model(data, feats * model.p)
+    # out = logits.log_softmax(dim=1)
+    loss = criterion(logits[idx_train], model.prompts, labels[idx_train])
     loss_val = loss.item()
 
     loss *= lamb
@@ -43,7 +43,7 @@ def train_sage(model, dataloader, feats, labels, criterion, optimizer, lamb=1):
         batch_labels = labels[output_nodes]
 
         # Compute loss and prediction
-        logits = model(blocks, batch_feats)
+        logits = model(blocks, batch_feats * model.p)
         # out = logits.log_softmax(dim=1)
         loss = criterion(logits, model.prompts, batch_labels)
         total_loss += loss.item()
@@ -93,7 +93,7 @@ def evaluate(model, data, feats, labels, criterion, evaluator, idx_eval=None):
     """
     model.eval()
     with torch.no_grad():
-        logits = model.inference(data, feats)
+        logits = model.inference(data, feats * model.p)
         # out = logits.log_softmax(dim=1)
         if idx_eval is None:
             loss = criterion(logits, model.prompts, labels)
@@ -434,14 +434,14 @@ def run_inductive(
                 )
                 # Use criterion & evaluator instead of evaluate to avoid redundant forward pass
                 loss_val = criterion(
-                    obs_out[obs_idx_val], obs_labels[obs_idx_val]
+                    obs_out[obs_idx_val], model.prompts, obs_labels[obs_idx_val]
                 ).item()
-                score_val = evaluator(obs_out[obs_idx_val], obs_labels[obs_idx_val])
+                score_val = evaluator(obs_out[obs_idx_val], model.prompts, obs_labels[obs_idx_val])
                 loss_test_tran = criterion(
-                    obs_out[obs_idx_test], obs_labels[obs_idx_test]
+                    obs_out[obs_idx_test], model.prompts, obs_labels[obs_idx_test]
                 ).item()
                 score_test_tran = evaluator(
-                    obs_out[obs_idx_test], obs_labels[obs_idx_test]
+                    obs_out[obs_idx_test], model.prompts, obs_labels[obs_idx_test]
                 )
 
                 # Evaluate the inductive part with the full graph
@@ -498,7 +498,7 @@ def run_inductive(
             model, data_eval, feats, labels, criterion, evaluator, idx_test_ind
         )
 
-    score_test_tran = evaluator(obs_out[obs_idx_test], obs_labels[obs_idx_test])
+    score_test_tran = evaluator(obs_out[obs_idx_test], model.prompts, obs_labels[obs_idx_test])
     out[idx_obs] = obs_out
     logger.info(
         f"Best valid model at epoch: {best_epoch :3d}, score_val: {score_val :.4f}, score_test_tran: {score_test_tran :.4f}, score_test_ind: {score_test_ind :.4f}"
@@ -727,7 +727,7 @@ def distill_run_inductive(
     )
 
     # Use evaluator instead of evaluate to avoid redundant forward pass
-    score_test_tran = evaluator(obs_out[obs_idx_test], labels_test_tran)
+    score_test_tran = evaluator(obs_out[obs_idx_test], model.prompts, labels_test_tran)
     out[idx_obs] = obs_out
 
     logger.info(

@@ -188,16 +188,21 @@ def run(args):
             "inductive",
             f"split_rate_{args.split_rate}",
             args.dataset,
-            f"{args.teacher}_{args.student}",
+            f"{args.dataset_base}_{args.teacher}_{args.student}" if args.student else f"{args.dataset_base}_{args.teacher}",
             f"seed_{args.seed}",
         )
         model_dir = Path.cwd().joinpath(
             args.model_path,
-            "inductive",
-            f"split_rate_{args.split_rate}",
-            args.dataset,
-            args.teacher,
+            "transductive",
+            args.dataset_base,
+            f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
             f"seed_{args.seed}",
+            # args.model_path,
+            # "inductive",
+            # f"split_rate_{args.split_rate}",
+            # args.dataset_base,
+            # f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
+            # f"seed_{args.seed}",
         )
     else:
         raise ValueError(f"Unknown experiment setting! {args.exp_setting}")
@@ -310,7 +315,7 @@ def run(args):
     logger.info(f"# params {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
     """ Saving student outputs """
-    out_np = out.detach().cpu().numpy()
+    out_np = out.numpy(force=True)
     np.savez(output_dir.joinpath("out"), out_np)
 
     """ Saving loss curve and model """

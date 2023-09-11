@@ -14,18 +14,18 @@ import torch_geometric.transforms as T
 
 
 class SemiSupervisedAutoencoder(nn.Module):
-    def __init__(self, num_classes, dropout_autoencoder, dropout_MLP):
+    def __init__(self, num_feats, num_classes, dropout_autoencoder, dropout_MLP):
         super().__init__()
 
         # Shared encoder
         self.encoder = nn.Sequential(
-            nn.Linear(1433, 1024),
-            nn.ReLU(),
-            nn.Dropout(dropout_autoencoder),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Dropout(dropout_autoencoder),
-            nn.Linear(512, 256),
+            # nn.Linear(1433, 1024),
+            # nn.ReLU(),
+            # nn.Dropout(dropout_autoencoder),
+            # nn.Linear(1024, 512),
+            # nn.ReLU(),
+            # nn.Dropout(dropout_autoencoder),
+            nn.Linear(num_feats, 256),
             nn.ReLU(),
             nn.Dropout(dropout_autoencoder),
             nn.Linear(256, 128)
@@ -35,12 +35,12 @@ class SemiSupervisedAutoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(128, 256),
             nn.ReLU(),
-            nn.Linear(256, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1433),
-            nn.Sigmoid()  # because the input is binary
+            nn.Linear(256, num_feats),
+            # nn.ReLU(),
+            # nn.Linear(512, 1024),
+            # nn.ReLU(),
+            # nn.Linear(1024, 1433),
+            # nn.Sigmoid()  # because the input is binary
         )
 
         # Classifier for classification task
@@ -101,7 +101,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="PyTorch DGL implementation")
     parser.add_argument("--device", type=int, default=0, help="CUDA device, -1 means CPU")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
-    parser.add_argument('--dataset', type=str, default='cora', choices=['cora', 'citeSeer', 'pubmed'])
+    parser.add_argument('--dataset', type=str, default='cora', choices=['cora', 'citeseer', 'pubmed'])
     parser.add_argument("--learning_rate", type=float, default=0.01)
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument("--dropout_autoencoder", type=float, default=0)
@@ -133,7 +133,7 @@ def run(args):
     dataset = Planetoid(path, args.dataset, transform=T.ToDevice(device))
     data = dataset[0]
 
-    model = SemiSupervisedAutoencoder(data.y.max().item()+1, args.dropout_autoencoder, args.dropout_MLP).to(device)
+    model = SemiSupervisedAutoencoder(data.x.size(1), data.y.max().item()+1, args.dropout_autoencoder, args.dropout_MLP).to(device)
     criterion = CombinedLoss(args.lamb)
     optimizer = Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     evaluator = AccuracyEvaluator()
@@ -166,7 +166,7 @@ def run(args):
     adj_matrix = ss.csr_matrix((ones, (edge_list[0], edge_list[1])))
 
     sparse_graph = SparseGraph(adj_matrix, attr_matrix=z.numpy(force=True), labels=data.y.numpy(force=True))
-    save_sparse_graph_to_npz('data/cora.npz', sparse_graph)
+    save_sparse_graph_to_npz(f'data/{args.dataset}.npz', sparse_graph)
 
 
 def main():
