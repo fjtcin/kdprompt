@@ -5,7 +5,7 @@ from torch import optim
 from torch import nn
 from pathlib import Path
 from models import Model
-from criterions import CosineSimilarityLoss
+from criterion import CosineSimilarityLoss
 from dataloader import load_data
 from utils import (
     get_logger,
