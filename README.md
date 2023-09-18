@@ -19,5 +19,5 @@ python test_prompt.py --dataset cora --teacher MLP --prompts_dim 64 --seed 10
 ```bash
 # Baseline
 python train_teacher.py --exp_setting tran --teacher SAGE --dataset cora --labelrate_train 20 --feature_aug_k 0
-python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --labelrate_train 20 --feature_aug_k 0
+python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --labelrate_train 20 --feature_aug_k 1
 ```
