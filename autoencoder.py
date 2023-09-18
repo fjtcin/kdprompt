@@ -16,32 +16,21 @@ import torch_geometric.transforms as T
 class SemiSupervisedAutoencoder(nn.Module):
     def __init__(self, num_feats, num_classes, dropout_autoencoder, dropout_MLP):
         super().__init__()
+        assert num_feats > 128
 
         # Shared encoder
-        self.encoder = nn.Sequential(
-            # nn.Linear(1433, 1024),
-            # nn.ReLU(),
-            # nn.Dropout(dropout_autoencoder),
-            # nn.Linear(1024, 512),
-            # nn.ReLU(),
-            # nn.Dropout(dropout_autoencoder),
-            nn.Linear(num_feats, 256),
-            nn.ReLU(),
-            nn.Dropout(dropout_autoencoder),
-            nn.Linear(256, 128)
-        )
+        num_feats_log = (num_feats - 1).bit_length() - 1
+        encoder_lst = [nn.Linear(num_feats, 1<<num_feats_log)]
+        for i in range(num_feats_log, 7, -1):
+            encoder_lst += [nn.ReLU(), nn.Dropout(dropout_autoencoder), nn.Linear(1<<i, 1<<i-1)]
+        self.encoder = nn.Sequential(*encoder_lst)
 
         # Decoder for reconstruction task
-        self.decoder = nn.Sequential(
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, num_feats),
-            # nn.ReLU(),
-            # nn.Linear(512, 1024),
-            # nn.ReLU(),
-            # nn.Linear(1024, 1433),
-            # nn.Sigmoid()  # because the input is binary
-        )
+        decoder_lst = []
+        for i in range(7, num_feats_log):
+            decoder_lst += [nn.Linear(1<<i, 1<<i+1), nn.ReLU()]
+        decoder_lst += [nn.Linear(1<<num_feats_log, num_feats), nn.ReLU()]
+        self.decoder = nn.Sequential(*decoder_lst)
 
         # Classifier for classification task
         self.classifier = nn.Sequential(
