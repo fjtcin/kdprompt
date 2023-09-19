@@ -45,7 +45,8 @@ def get_args():
         "--exp_setting",
         type=str,
         default="tran",
-        help="Experiment setting, one of [tran, ind]",
+        choices=["tran", "ind"],
+        help="transductive or inductive",
     )
     parser.add_argument(
         "--eval_interval", type=int, default=1, help="Evaluate once per how many epochs"
@@ -159,7 +160,7 @@ def run(args):
             args.teacher,
             f"seed_{args.seed}",
         )
-    elif args.exp_setting == "ind":
+    else:
         output_dir = Path.cwd().joinpath(
             args.output_path,
             "inductive",
@@ -168,8 +169,6 @@ def run(args):
             args.teacher,
             f"seed_{args.seed}",
         )
-    else:
-        raise ValueError(f"Unknown experiment setting! {args.exp_setting}")
     args.output_dir = output_dir
 
     check_writable(output_dir, overwrite=False)
@@ -239,7 +238,7 @@ def run(args):
         )
         score_lst = [score_test]
 
-    elif args.exp_setting == "ind":
+    else:
         indices = graph_split(idx_train, idx_val, idx_test, args.split_rate, args.seed)
 
         # propagate node feature. The propagation for the observed graph only happens within the subgraph obs_g

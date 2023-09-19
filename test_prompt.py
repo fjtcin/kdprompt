@@ -46,7 +46,14 @@ def get_args():
         "--exp_setting",
         type=str,
         default="tran",
-        help="Experiment setting, one of [tran, ind]",
+        choices=["tran", "ind"],
+        help="transductive or inductive",
+    )
+    parser.add_argument(
+        "--upstream_exp_setting",
+        type=str,
+        default="tran",
+        choices=["tran", "ind"],
     )
     parser.add_argument(
         "--eval_interval", type=int, default=1, help="Evaluate once per how many epochs"
@@ -115,6 +122,11 @@ def get_args():
         help="add white noise to features for analysis, value in [0, 1] for noise level",
     )
     parser.add_argument(
+        "--upstream_feature_noise",
+        type=float,
+        default=0,
+    )
+    parser.add_argument(
         "--split_rate",
         type=float,
         default=0.2,
@@ -156,10 +168,13 @@ def run(args):
     else:
         device = "cpu"
 
+    args.model_path = args.output_path  # Path to load the student model
+
     if args.feature_noise != 0:
         args.output_path = args.output_path + f"/noise_{args.feature_noise}"
 
-    args.model_path = args.output_path  # Path to load the student model
+    if args.upstream_feature_noise != 0:
+        args.model_path = args.model_path + f"/noise_{args.upstream_feature_noise}"
 
     if args.feature_aug_k > 0:
         args.output_path = args.output_path + f"/aug_hop_{args.feature_aug_k}"
@@ -175,14 +190,7 @@ def run(args):
             f"{args.dataset_base}_{args.teacher}_{args.student}" if args.student else f"{args.dataset_base}_{args.teacher}",
             f"seed_{args.seed}",
         )
-        model_dir = Path.cwd().joinpath(
-            args.model_path,
-            "transductive",
-            args.dataset_base,
-            f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
-            f"seed_{args.seed}",
-        )
-    elif args.exp_setting == "ind":
+    else:
         output_dir = Path.cwd().joinpath(
             args.output_path,
             "inductive",
@@ -191,22 +199,25 @@ def run(args):
             f"{args.dataset_base}_{args.teacher}_{args.student}" if args.student else f"{args.dataset_base}_{args.teacher}",
             f"seed_{args.seed}",
         )
+    args.output_dir = output_dir
+
+    if args.upstream_exp_setting == "tran":
         model_dir = Path.cwd().joinpath(
             args.model_path,
             "transductive",
             args.dataset_base,
             f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
             f"seed_{args.seed}",
-            # args.model_path,
-            # "inductive",
-            # f"split_rate_{args.split_rate}",
-            # args.dataset_base,
-            # f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
-            # f"seed_{args.seed}",
         )
     else:
-        raise ValueError(f"Unknown experiment setting! {args.exp_setting}")
-    args.output_dir = output_dir
+        model_dir = Path.cwd().joinpath(
+            args.model_path,
+            "inductive",
+            f"split_rate_{args.split_rate}",
+            args.dataset_base,
+            f"{args.teacher}_{args.student}" if args.student else f"{args.teacher}",
+            f"seed_{args.seed}",
+        )
 
     check_writable(output_dir, overwrite=False)
     check_readable(model_dir)
@@ -254,7 +265,6 @@ def run(args):
         param.requires_grad = False
     model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
     model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
-    # model.p.requires_grad_(False)
     logger.info(f"prompts.requires_grad = {model.prompts.requires_grad}, p.requires_grad = {model.p.requires_grad}")
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
@@ -286,7 +296,7 @@ def run(args):
         )
         score_lst = [score_test]
 
-    elif args.exp_setting == "ind":
+    else:
         indices = graph_split(idx_train, idx_val, idx_test, args.split_rate, args.seed)
 
         # propagate node feature. The propagation for the observed graph only happens within the subgraph obs_g

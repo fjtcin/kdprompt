@@ -46,7 +46,8 @@ def get_args():
         "--exp_setting",
         type=str,
         default="tran",
-        help="Experiment setting, one of [tran, ind]",
+        choices=["tran", "ind"],
+        help="transductive or inductive",
     )
     parser.add_argument(
         "--eval_interval", type=int, default=1, help="Evaluate once per how many epochs"
@@ -187,7 +188,7 @@ def run(args):
             args.teacher,
             f"seed_{args.seed}",
         )
-    elif args.exp_setting == "ind":
+    else:
         output_dir = Path.cwd().joinpath(
             args.output_path,
             "inductive",
@@ -204,8 +205,6 @@ def run(args):
             args.teacher,
             f"seed_{args.seed}",
         )
-    else:
-        raise ValueError(f"Unknown experiment setting! {args.exp_setting}")
     args.output_dir = output_dir
 
     check_writable(output_dir, overwrite=False)
@@ -248,10 +247,8 @@ def run(args):
     """ Model init """
     model = Model(conf)
     # model.prompts = torch.nn.Parameter(torch.randn(label_dim, conf["prompts_dim"]).to(device))
-    model.prompts = torch.nn.Parameter(torch.from_numpy(np.load(out_t_dir.joinpath("prompts.npz"))["arr_0"]).to(device))
-    model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device))
-    model.prompts.requires_grad_(False)
-    model.p.requires_grad_(False)
+    model.prompts = torch.nn.Parameter(torch.from_numpy(np.load(out_t_dir.joinpath("prompts.npz"))["arr_0"]).to(device), requires_grad=False)
+    model.p = torch.nn.Parameter(torch.ones(1, conf["feat_dim"]).to(device), requires_grad=False)
     logger.info(f"prompts.requires_grad = {model.prompts.requires_grad}, p.requires_grad = {model.p.requires_grad}")
     optimizer = optim.Adam(
         model.parameters(), lr=conf["learning_rate"], weight_decay=conf["weight_decay"]
@@ -290,7 +287,7 @@ def run(args):
         )
         score_lst = [score_test]
 
-    elif args.exp_setting == "ind":
+    else:
         # Create inductive split
         obs_idx_train, obs_idx_val, obs_idx_test, idx_obs, idx_test_ind = graph_split(
             idx_train, idx_val, idx_test, args.split_rate, args.seed
