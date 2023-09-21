@@ -29,7 +29,7 @@ class SemiSupervisedAutoencoder(nn.Module):
         decoder_lst = []
         for i in range(7, num_feats_log):
             decoder_lst += [nn.Linear(1<<i, 1<<i+1), nn.ReLU()]
-        decoder_lst += [nn.Linear(1<<num_feats_log, num_feats), nn.ReLU()]
+        decoder_lst += [nn.Linear(1<<num_feats_log, num_feats)]
         self.decoder = nn.Sequential(*decoder_lst)
 
         # Classifier for classification task
@@ -50,12 +50,12 @@ class SemiSupervisedAutoencoder(nn.Module):
 class CombinedLoss(nn.Module):
     def __init__(self, lamb=.5):
         super().__init__()
-        self.mse_loss = nn.MSELoss()
+        self.kl_div_loss = nn.KLDivLoss(reduction="batchmean", log_target=True)
         self.cross_entropy_loss = nn.CrossEntropyLoss()
         self.lamb = lamb
 
     def forward(self, reconstructed, original, class_probs, labels):
-        reconstruction_loss = self.mse_loss(reconstructed, original)
+        reconstruction_loss = self.kl_div_loss(reconstructed.log_softmax(dim=1), original.log_softmax(dim=1))
         classification_loss = self.cross_entropy_loss(class_probs, labels)
         return self.lamb * reconstruction_loss + (1 - self.lamb) * classification_loss
 
