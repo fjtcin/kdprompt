@@ -19,7 +19,6 @@ import scipy
 import pandas as pd
 import json
 from dgl.data.utils import load_graphs
-from os import path
 from category_encoders import CatBoostEncoder
 from pathlib import Path
 from google_drive_downloader import GoogleDriveDownloader as gdd
@@ -32,6 +31,7 @@ from data_preprocess import (
     binarize_labels,
 )
 from ogb.nodeproppred import DglNodePropPredDataset
+from torch_geometric.datasets import Planetoid
 
 CPF_data = ["cora", "citeseer", "pubmed", "a-computer", "a-photo"]
 OGB_data = ["ogbn-arxiv", "ogbn-products"]
@@ -43,10 +43,7 @@ def load_data(dataset, dataset_path, **kwargs):
     if dataset in CPF_data:
         return load_cpf_data(
             dataset,
-            dataset_path,
-            kwargs["seed"],
-            kwargs["labelrate_train"],
-            kwargs["labelrate_val"],
+            dataset_path
         )
     elif dataset in OGB_data:
         return load_ogb_data(dataset, dataset_path)
@@ -79,7 +76,7 @@ def load_ogb_data(dataset, dataset_path):
     return g, labels, idx_train, idx_val, idx_test
 
 
-def load_cpf_data(dataset, dataset_path, seed, labelrate_train, labelrate_val):
+def load_cpf_data(dataset, dataset_path):
     data_path = Path.cwd().joinpath(dataset_path, f"{dataset}.npz")
     if os.path.isfile(data_path):
         data = load_npz_to_sparse_graph(data_path)
@@ -92,10 +89,7 @@ def load_cpf_data(dataset, dataset_path, seed, labelrate_train, labelrate_val):
 
     labels = binarize_labels(labels)
 
-    random_state = np.random.RandomState(seed)
-    idx_train, idx_val, idx_test = get_train_val_test_split(
-        random_state, labels, labelrate_train, labelrate_val
-    )
+    idx_train, idx_val, idx_test = get_train_val_test_split(dataset)
 
     if sp.isspmatrix(features):
         features = features.toarray()
@@ -198,7 +192,7 @@ def load_penn94_mat(data_path):
 
 
 def load_pokec_mat(data_path):
-    if not path.exists(data_path):
+    if not os.path.exists(data_path):
         gdd.download_file_from_google_drive(
             file_id=dataset_drive_url["pokec"], dest_path=data_path, showsize=True
         )
@@ -506,7 +500,7 @@ class SparseGraph:
         """
         G = self.to_unweighted().to_undirected()
         G.adj_matrix = eliminate_self_loops_adj(G.adj_matrix)
-        G = largest_connected_components(G, 1)
+        # G = largest_connected_components(G, 1)
         return G
 
     def unpack(self):
@@ -654,83 +648,7 @@ def save_sparse_graph_to_npz(filepath, sparse_graph):
     np.savez(filepath, **data_dict)
 
 
-def get_train_val_test_split(
-    random_state,
-    labels,
-    train_examples_per_class=None,
-    val_examples_per_class=None,
-    test_examples_per_class=None,
-    train_size=None,
-    val_size=None,
-    test_size=None,
-):
-
-    num_samples, num_classes = labels.shape
-    remaining_indices = list(range(num_samples))
-    if train_examples_per_class is not None:
-        train_indices = sample_per_class(random_state, labels, train_examples_per_class)
-    else:
-        # select train examples with no respect to class distribution
-        train_indices = random_state.choice(
-            remaining_indices, train_size, replace=False
-        )
-
-    if val_examples_per_class is not None:
-        val_indices = sample_per_class(
-            random_state,
-            labels,
-            val_examples_per_class,
-            forbidden_indices=train_indices,
-        )
-    else:
-        remaining_indices = np.setdiff1d(remaining_indices, train_indices)
-        val_indices = random_state.choice(remaining_indices, val_size, replace=False)
-
-    forbidden_indices = np.concatenate((train_indices, val_indices))
-    if test_examples_per_class is not None:
-        test_indices = sample_per_class(
-            random_state,
-            labels,
-            test_examples_per_class,
-            forbidden_indices=forbidden_indices,
-        )
-    elif test_size is not None:
-        remaining_indices = np.setdiff1d(remaining_indices, forbidden_indices)
-        test_indices = random_state.choice(remaining_indices, test_size, replace=False)
-    else:
-        test_indices = np.setdiff1d(remaining_indices, forbidden_indices)
-
-    # assert that there are no duplicates in sets
-    assert len(set(train_indices)) == len(train_indices)
-    assert len(set(val_indices)) == len(val_indices)
-    assert len(set(test_indices)) == len(test_indices)
-    # assert sets are mutually exclusive
-    assert len(set(train_indices) - set(val_indices)) == len(set(train_indices))
-    assert len(set(train_indices) - set(test_indices)) == len(set(train_indices))
-    assert len(set(val_indices) - set(test_indices)) == len(set(val_indices))
-    if test_size is None and test_examples_per_class is None:
-        # all indices must be part of the split
-        assert (
-            len(np.concatenate((train_indices, val_indices, test_indices)))
-            == num_samples
-        )
-
-    if train_examples_per_class is not None:
-        train_labels = labels[train_indices, :]
-        train_sum = np.sum(train_labels, axis=0)
-        # assert all classes have equal cardinality
-        assert np.unique(train_sum).size == 1
-
-    if val_examples_per_class is not None:
-        val_labels = labels[val_indices, :]
-        val_sum = np.sum(val_labels, axis=0)
-        # assert all classes have equal cardinality
-        assert np.unique(val_sum).size == 1
-
-    if test_examples_per_class is not None:
-        test_labels = labels[test_indices, :]
-        test_sum = np.sum(test_labels, axis=0)
-        # assert all classes have equal cardinality
-        assert np.unique(test_sum).size == 1
-
-    return train_indices, val_indices, test_indices
+def get_train_val_test_split(dataset):
+    dataset = Planetoid('data/planetoid', dataset)
+    data = dataset[0]
+    return np.where(data.train_mask)[0], np.where(data.val_mask)[0], np.where(data.test_mask)[0]

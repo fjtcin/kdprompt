@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 import copy
 import numpy as np
 import scipy.sparse as ss
@@ -118,8 +117,7 @@ def run(args):
         device = torch.device("cuda:" + str(args.device))
     else:
         device = "cpu"
-    path = Path('data/planetoid')
-    dataset = Planetoid(path, args.dataset, transform=T.ToDevice(device))
+    dataset = Planetoid('data/planetoid', args.dataset, transform=T.ToDevice(device))
     data = dataset[0]
 
     model = SemiSupervisedAutoencoder(data.x.size(1), data.y.max().item()+1, args.dropout_autoencoder, args.dropout_MLP).to(device)

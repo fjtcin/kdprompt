@@ -62,18 +62,6 @@ def get_args():
     parser.add_argument("--dataset", type=str, default="cora", help="Dataset")
     parser.add_argument("--data_path", type=str, default="./data", help="Path to data")
     parser.add_argument(
-        "--labelrate_train",
-        type=int,
-        default=20,
-        help="How many labeled data per class as train set",
-    )
-    parser.add_argument(
-        "--labelrate_val",
-        type=int,
-        default=30,
-        help="How many labeled data per class in valid set",
-    )
-    parser.add_argument(
         "--split_idx",
         type=int,
         default=0,
@@ -219,8 +207,6 @@ def run(args):
         args.data_path,
         split_idx=args.split_idx,
         seed=args.seed,
-        labelrate_train=args.labelrate_train,
-        labelrate_val=args.labelrate_val,
     )
     logger.info(f"Total {g.number_of_nodes()} nodes, {g.number_of_edges()} edges.")
 
