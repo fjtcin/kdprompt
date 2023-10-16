@@ -94,12 +94,12 @@ def get_args():
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument("--dropout_autoencoder", type=float, default=0)
     parser.add_argument("--dropout_MLP", type=float, default=0)
-    parser.add_argument("--max_epoch", type=int, default=500, help="Evaluate once per how many epochs")
+    parser.add_argument("--max_epoch", type=int, default=1000, help="Evaluate once per how many epochs")
     parser.add_argument("--eval_interval", type=int, default=1, help="Evaluate once per how many epochs")
     parser.add_argument(
         "--patience",
         type=int,
-        default=50,
+        default=100,
         help="Early stop is the score on validation set does not improve for how many epochs",
     )
     parser.add_argument(
@@ -129,9 +129,7 @@ def run(args):
     for epoch in range(1, args.max_epoch + 1):
         train(model, data.x[data.train_mask], data.y[data.train_mask], criterion, optimizer)
         if epoch % args.eval_interval == 0:
-            loss_train, score_train = eval(model, data.x[data.train_mask], data.y[data.train_mask], criterion, evaluator)
             loss_val, score_val = eval(model, data.x[data.val_mask], data.y[data.val_mask], criterion, evaluator)
-            if epoch / args.eval_interval % 10 == 0: print(f"(epoch={epoch}, {loss_train:.4f}, {score_train:.4f}) loss: {loss_val:.4f}, score: {score_val:.4f}")
             if score_val >= best_score_val:
                 best_score_val = score_val
                 state = copy.deepcopy(model.state_dict())
@@ -142,10 +140,10 @@ def run(args):
                 break
 
     model.load_state_dict(state)
+    loss_test, score_test = eval(model, data.x[data.test_mask], data.y[data.test_mask], criterion, evaluator)
+    print(f"loss: {loss_test:.4f}, score: {score_test:.4f}")
     model.eval()
     with torch.no_grad():
-        loss_test, score_test = eval(model, data.x[data.test_mask], data.y[data.test_mask], criterion, evaluator)
-        print(f"(test) loss: {loss_test:.4f}, score: {score_test:.4f}")
         z = model.encoder(data.x)
 
     edge_list = data.edge_index.numpy(force=True)

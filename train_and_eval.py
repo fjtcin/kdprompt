@@ -715,7 +715,7 @@ def distill_run_inductive(
             else:
                 count += 1
 
-        if count == conf["patience"] or epoch == conf["max_epoch"]:
+        if count == conf["patience"]:
             break
 
     model.load_state_dict(state)
