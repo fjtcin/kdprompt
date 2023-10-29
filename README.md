@@ -8,10 +8,13 @@ python test_prompt.py --dataset cora --student MLP --prompts_dim 64 --feature_au
 ```
 
 ```bash
-# SAGE
-python train_teacher.py --dataset ogbn-arxiv --teacher SAGE --prompts_dim 64 --save_results --num_exp 5
-python test_prompt.py --dataset cora --teacher SAGE --prompts_dim 64 --num_exp 5
-# MLP
+# -prompt
+python train_teacher.py --dataset ogbn-arxiv --teacher MLP --prompts_dim 64 --save_results --feature_aug_k 1 --num_exp 5
+python test_prompt.py --dataset cora --teacher MLP --prompts_dim 64 --feature_aug_k 1 --upstream_feature_aug_k 1 --num_exp 5
+# -aug
+python train_student.py --dataset ogbn-arxiv --student MLP --prompts_dim 64 --save_results --lamb .5 --num_exp 5
+python test_prompt.py --dataset cora --student MLP --prompts_dim 64 --num_exp 5
+# -both
 python train_teacher.py --dataset ogbn-arxiv --teacher MLP --prompts_dim 64 --save_results --num_exp 5
 python test_prompt.py --dataset cora --teacher MLP --prompts_dim 64 --num_exp 5
 ```

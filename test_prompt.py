@@ -1,4 +1,5 @@
 import argparse
+import copy
 import numpy as np
 import torch
 from torch import optim
@@ -335,8 +336,10 @@ def run(args):
 def repeat_run(args):
     scores = []
     for seed in range(args.num_exp):
-        args.seed = seed
-        scores.append(run(args))
+        tmp = copy.deepcopy(args)
+        tmp.seed = seed
+        scores.append(run(tmp))
+    args.output_dir = tmp.output_dir
     scores_np = np.array(scores)
     return scores_np.mean(axis=0), scores_np.std(axis=0)
 
