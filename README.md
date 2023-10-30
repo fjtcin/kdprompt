@@ -26,3 +26,12 @@ python train_teacher.py --exp_setting tran --teacher SAGE --dataset cora --featu
 python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --feature_aug_k 0 --num_exp 5
 python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --feature_aug_k 1 --num_exp 5
 ```
+
+Few Shot
+Autoencoder for pre-training
+different model hyper-parameters for student and prompt
+
+------------
+
+inductive learning: model parameters inherit from transparnt student?
+(also feature_noise)
