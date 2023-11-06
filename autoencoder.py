@@ -90,6 +90,7 @@ def get_args():
     parser.add_argument("--device", type=int, default=0, help="CUDA device, -1 means CPU")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument('--dataset', type=str, default='cora', choices=['cora', 'citeseer', 'pubmed'])
+    parser.add_argument("--data_path", type=str, default="./data", help="Path to data")
     parser.add_argument("--learning_rate", type=float, default=0.01)
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument("--dropout_autoencoder", type=float, default=0)
@@ -117,7 +118,7 @@ def run(args):
         device = torch.device("cuda:" + str(args.device))
     else:
         device = "cpu"
-    dataset = Planetoid('data/planetoid', args.dataset, transform=T.ToDevice(device))
+    dataset = Planetoid(args.data_path, args.dataset, transform=T.ToDevice(device))
     data = dataset[0]
 
     model = SemiSupervisedAutoencoder(data.x.size(1), data.y.max().item()+1, args.dropout_autoencoder, args.dropout_MLP).to(device)
