@@ -649,6 +649,6 @@ def save_sparse_graph_to_npz(filepath, sparse_graph):
 
 
 def get_train_val_test_split(dataset):
-    dataset = Planetoid('data/planetoid', dataset)
+    dataset = Planetoid('data', dataset)
     data = dataset[0]
     return np.where(data.train_mask)[0], np.where(data.val_mask)[0], np.where(data.test_mask)[0]

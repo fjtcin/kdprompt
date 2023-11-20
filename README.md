@@ -27,8 +27,6 @@ python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --featur
 python train_teacher.py --exp_setting tran --teacher MLP --dataset cora --feature_aug_k 1 --num_exp 5
 ```
 
-Few Shot
-Autoencoder for pre-training
 different model hyper-parameters for student and prompt
 
 ------------
